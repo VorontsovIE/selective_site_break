@@ -1,6 +1,7 @@
 require_relative 'perfectosape/results'
 require_relative 'sequence_with_snv'
-require_relative 'substitution_effects'
+require_relative 'site_list'
+require_relative 'output_configuration'
 
 require 'tempfile'
 require 'optparse'
@@ -101,7 +102,7 @@ pvalue_cutoff = 0.0005
 
 only_sites_overlapping_snv = false
 
-output_configuration = OutputConfiguration.default
+output_configuration = SubstitutionEffects::OutputConfiguration.default
 
 output_configuration.suppress_on_disrupted_sites_missing = false
 output_configuration.suppress_on_preserved_sites_missing = false
