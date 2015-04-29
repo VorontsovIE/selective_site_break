@@ -1,4 +1,5 @@
-class SubstitutionEffects
+module SubstitutionEffects
+class SiteList
   attr_reader :mutated_sites, :fold_change_cutoff, :pvalue_cutoff, :to_be_disrupted, :to_be_preserved
   def initialize(mutated_sites,
                 fold_change_cutoff: , pvalue_cutoff:,
@@ -12,6 +13,12 @@ class SubstitutionEffects
   
   def motifs_of_interest
     to_be_disrupted | to_be_preserved
+  end
+
+  def mutated_sites_of_interest
+    mutated_sites.select{|site|
+      motifs_of_interest.include?(site.motif_name)
+    }
   end
 
   # selects motifs by corresponding sites
@@ -51,6 +58,19 @@ class SubstitutionEffects
     select_motifs{|site_info|
       site_info.emerged?(fold_change_cutoff: fold_change_cutoff)
     } & all_sites_after_substitution
+  end
+
+  # Reduction to motifs of interest
+  def preserved_motifs_of_interest
+    preserved_motifs & motifs_of_interest
+  end
+
+  def disrupted_motifs_of_interest
+    disrupted_motifs & motifs_of_interest
+  end
+
+  def emerged_motifs_of_interest
+    emerged_motifs & motifs_of_interest
   end
 
   # sites should be disrupted/preserved but sequence don't even have motif's site
@@ -101,48 +121,5 @@ class SubstitutionEffects
     # result -= 0.5 * (should_be_preserved_but_disrupted.size + should_be_disrupted_but_preserved.size + should_be_disrupted_but_emerged.size) # counts
     result
   end
-
-
-  def motifs_string(msg, motifs)
-    "#{msg}: #{motifs.to_a.sort.join(',')}"
-  end
-
-  def output_motifs(stream, msg, motifs)
-    stream.puts motifs_string(msg, motifs)  unless motifs.empty?
-  end
-
-  def output(stream, show_all_sites: true, show_attentions: true, show_strong_violations: true, show_site_details: false)
-    stream.puts "Quality: #{quality}"
-    # Sites of interest
-    output_motifs stream, 'Preserved sites of interest', preserved_motifs & motifs_of_interest
-    output_motifs stream, 'Disrupted sites of interest', disrupted_motifs & motifs_of_interest
-    output_motifs stream, 'Emerged sites of interest', emerged_motifs & motifs_of_interest
-
-    # Sites of all motifs and all disruption/emergence events (not only motifs of interest)
-    if show_all_sites
-      output_motifs stream, 'Sites before substitution', all_sites_before_substitution
-      output_motifs stream, 'Sites after substitution', all_sites_after_substitution
-      output_motifs stream, 'Disrupted sites (all)', disrupted_motifs
-      output_motifs stream, 'Emerged sites (all)', emerged_motifs
-    end
-
-    # Attentions! Site which should be disrupted/emerged do not exist at all
-    if show_attentions
-      output_motifs stream, 'Attention! Site should be disrupted, but there\'s no site', missing_from_disrupted
-      output_motifs stream, 'Attention! Site should be preserved, but there\'s no site', missing_from_preserved
-    end
-
-    # Event works opposite to desired
-    if show_strong_violations
-      output_motifs stream, 'Strong violations! Site should be preserved, but was disrupted', should_be_preserved_but_disrupted
-      output_motifs stream, 'Strong violations! Site should be disrupted, but was preserved', should_be_disrupted_but_preserved
-      output_motifs stream, 'Strong violations! Site should be disrupted, but emerged', should_be_disrupted_but_emerged
-    end
-
-    # sites of interest detailed info (PerfectosAPE output)
-    if show_site_details
-      interest_sites = show_all_sites ? mutated_sites : mutated_sites.select{|site| motifs_of_interest.include?(site.motif_name) }
-      stream.puts(interest_sites)
-    end
-  end
+end
 end
