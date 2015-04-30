@@ -44,7 +44,7 @@ def mutated_sites_by_substitution_name(sequence, pvalue_cutoff: 0.0005)
     }
     f.close
 
-    cmd = "java -cp ape.jar ru.autosome.perfectosape.SNPScan ./motif_collection/ #{f.path} --precalc ./motif_collection_thresholds --fold-change-cutoff 1 --pvalue-cutoff #{pvalue_cutoff}"
+    cmd = "java -cp ape.jar ru.autosome.perfectosape.SNPScan ./motif_collection/ #{f.path} --precalc ./motif_collection_thresholds --fold-change-cutoff 1 --pvalue-cutoff 1"
     IO.popen(cmd) do |pipe|
       PerfectosAPE::Result.each_in_stream(pipe).to_a.group_by(&:variant_id)
     end
@@ -198,7 +198,7 @@ sequence_with_snv.allele_variants.each_index do |i|
     sites_by_substitution = select_sites_ovelapping_snv(sites_by_substitution, sequence_with_snv.left.length)
   end
 
-  File.open("output_#{i}.txt", 'w') do |fw|
+  File.open("output_allele_#{sequence_with_snv.allele_variants[i]}.txt", 'w') do |fw|
     output_summary_of_sites(sequence, sites_by_substitution,
                             fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff,
                             to_be_disrupted: to_be_disrupted, to_be_preserved: to_be_preserved,

@@ -87,7 +87,23 @@ module SubstitutionEffects
       # sites of interest detailed info (PerfectosAPE output)
       if show_site_details
         interest_sites = show_all_sites ? site_list.mutated_sites : site_list.mutated_sites_of_interest
-        stream.puts(interest_sites)
+
+        interest_sites.each do |site|
+          substitution_pos = site.variant_id.split(",").first.to_i
+          if site.site_before_substitution?(pvalue_cutoff: site_list.pvalue_cutoff)
+            site_msg = "has site"
+            if site.disrupted?(fold_change_cutoff: site_list.fold_change_cutoff)
+              site_msg << "; disrupted"
+            elsif site.emerged?(fold_change_cutoff: site_list.fold_change_cutoff)
+              site_msg << "; emerged"
+            else
+              site_msg << "; preserved"
+            end
+          else
+            site_msg = "no site: #{'%.2g' % site.pvalue_1} > #{site_list.pvalue_cutoff}"
+          end
+          stream.puts ["(#{site_msg})", site.variant_id, site.motif_name, substitution_pos + site.pos_1, site.orientation_1, site.pvalue_1, site.fold_change, site.seq_1].join("\t")
+        end
       end
     end
   end
