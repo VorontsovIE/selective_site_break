@@ -102,7 +102,7 @@ module SubstitutionEffects
           else
             site_msg = "no site: #{'%.2g' % site.pvalue_1} > #{site_list.pvalue_cutoff}"
           end
-          stream.puts ["(#{site_msg})", site.variant_id, site.motif_name, substitution_pos + site.pos_1, site.orientation_1, site.pvalue_1, site.fold_change, site.seq_1].join("\t")
+          stream.puts ["(#{site_msg})", site.variant_id, site.motif_name, substitution_pos + site.pos_1, site.orientation_1, site.pvalue_1, site.pvalue_2, site.fold_change, site.seq_1].join("\t")
         end
       end
     end

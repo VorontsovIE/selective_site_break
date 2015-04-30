@@ -22,6 +22,10 @@ class SequenceWithSNV
     left.length + 1 + right.length
   end
 
+  def snv_position
+    left.length
+  end
+
   def revcomp
     SequenceWithSNV.new(Sequence.revcomp(right),
                         allele_variants.map{|letter| Sequence.complement(letter) },

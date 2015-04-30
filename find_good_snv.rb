@@ -25,8 +25,10 @@ def sequence_with_snv_by_substitution_name(sequence, substitution_name)
   make_seq_with_snv_by_position(sequence, pos.to_i, mut_nucleotide)
 end
 
-def possible_mutation_positions(sequence)
-  sequence.length.times.flat_map{|pos|
+def possible_mutation_positions(sequence, ignore_positions: [])
+  sequence.length.times.reject{|pos|
+    ignore_positions.include?(pos)
+  }.flat_map{|pos|
     orig_nucl = sequence[pos]
     mut_nucleotides = ['A','C','G','T'] - [orig_nucl]
     mut_nucleotides.map{|mut_nucl|
@@ -37,9 +39,9 @@ def possible_mutation_positions(sequence)
   }.to_h
 end
 
-def mutated_sites_by_substitution_name(sequence, pvalue_cutoff: 0.0005)
+def mutated_sites_by_substitution_name(sequence, pvalue_cutoff: 0.0005, ignore_positions: [])
   with_temp_file 'seq_generated.txt' do |f|
-    possible_mutation_positions(sequence).each{|substitution_name, seq_w_snv|
+    possible_mutation_positions(sequence, ignore_positions: ignore_positions).each{|substitution_name, seq_w_snv|
       f.puts "#{substitution_name}\t#{seq_w_snv}"
     }
     f.close
@@ -192,7 +194,7 @@ $stderr.puts "Motifs to be preserved:\n#{to_be_preserved.to_a.join(',')}"
 
 sequence_with_snv.allele_variants.each_index do |i|
   sequence = sequence_with_snv.sequence_variant(i)
-  sites_by_substitution = mutated_sites_by_substitution_name(sequence, pvalue_cutoff: pvalue_cutoff)
+  sites_by_substitution = mutated_sites_by_substitution_name(sequence, pvalue_cutoff: pvalue_cutoff, ignore_positions: [sequence_with_snv.snv_position])
 
   if only_sites_overlapping_snv
     sites_by_substitution = select_sites_ovelapping_snv(sites_by_substitution, sequence_with_snv.left.length)
