@@ -52,7 +52,6 @@ module SubstitutionEffects
         !site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
       } & all_sites_before_substitution
     end
-    
 
     def emerged_motifs
       select_motifs{|site_info|
@@ -117,7 +116,9 @@ module SubstitutionEffects
       result = 0
       result += 1.0 * quality_disruption  # ratio
       result += 1.0 * quality_preservation  # ratio
-      result -= 0.5 * ((missing_from_disrupted.size.to_f / to_be_disrupted.size) + (missing_from_preserved.size.to_f / to_be_preserved.size))  # ratios
+      missing_from_disrupted_part = (to_be_disrupted.size != 0) ? (missing_from_disrupted.size.to_f / to_be_disrupted.size) : 0
+      missing_from_preserved_part = (to_be_preserved.size != 0) ? (missing_from_preserved.size.to_f / to_be_preserved.size) : 0
+      result -= 0.5 * (missing_from_disrupted_part + missing_from_preserved_part)  # ratios
       # result -= 0.5 * (should_be_preserved_but_disrupted.size + should_be_disrupted_but_preserved.size + should_be_disrupted_but_emerged.size) # counts
       result
     end

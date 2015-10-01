@@ -53,6 +53,23 @@ def mutated_sites_by_substitution_name(sequence, pvalue_cutoff: 0.0005, ignore_p
   end
 end
 
+def all_sites_in_sequence(sequence, pvalue_cutoff: 0.0005)
+  len = sequence.length
+  mid = len / 2 
+  seq_w_snv = SequenceWithSNV.new('',[sequence[0], 'N'], sequence[1..-1])
+  with_temp_file 'seq_generated.txt' do |f|  
+    f.puts "sequence\t#{seq_w_snv}"
+    f.close
+
+    # We expand region so we don't imply any restrictions due to fictitious substitutions.
+    # Expansion region was taken with big reserve (just not to think)
+    cmd = "java -cp ape.jar ru.autosome.perfectosape.SNPScan ./motif_collection/ #{f.path} --precalc ./motif_collection_thresholds --fold-change-cutoff 1 --pvalue-cutoff 1 --expand-region #{sequence.length}"
+    IO.popen(cmd) do |pipe|
+      PerfectosAPE::Result.each_in_stream(pipe).to_a
+    end
+  end
+end
+
 def select_sites_ovelapping_snv(sites_by_substitution, snv_pos)
   sites_by_substitution.map{|variant_id, sites|
     substitution_pos = variant_id.split(",").first.to_i
@@ -80,6 +97,23 @@ def output_summary_of_sites(sequence, sites_by_substitution,
                             to_be_disrupted: , to_be_preserved: ,
                             output_configuration:, stream: $stdout
                           )
+  sites = all_sites_in_sequence(sequence)
+  if !output_configuration.show_all_sites
+    sites.select!{|site| (to_be_disrupted | to_be_preserved).include?(site.motif_name) }
+  end
+
+  if output_configuration.hide_non_sites
+    sites.select!{|site| site.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) }
+  end
+
+  stream.puts 'Motif best hits in original sequence:'
+  stream.puts ['Motif', 'P-value', 'Position', 'Strand', 'Site sequence', 'Comment'].join("\t")
+  sites.each{|site|
+    comment = site.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ? 'Is site' : 'Not a site'
+    stream.puts [site.motif_name, '%.2g' % site.pvalue_1, site.pos_1, site.orientation_1, site.seq_1.downcase, comment].join("\t")
+  }
+  stream.puts '==========================='
+
   sites_by_substitution.map{|substitution_name, mutated_sites|
     site_list = SubstitutionEffects::SiteList.new(mutated_sites,
                                                 fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff,
@@ -143,6 +177,12 @@ OptionParser.new do |opts|
   }
   opts.on('--show-all-sites', 'Show all sites in sequence (not only sites of interest)') {
     output_configuration.show_all_sites = true
+  }
+  opts.on('--hide-non-sites', 'Hide sites which didn\'t overcome threshold') {
+    output_configuration.hide_non_sites = true
+  }
+  opts.on('--hide-not-changed', 'Hide sites which didn\'t changed significantly (non-sites hides too)') {
+    output_configuration.hide_not_changed = true
   }
   opts.on('--show-site-details', 'Show site details') {
     output_configuration.show_site_details = true
