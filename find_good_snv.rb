@@ -1,7 +1,9 @@
-require_relative 'perfectosape/results'
-require_relative 'sequence_with_snv'
-require_relative 'site_list'
-require_relative 'output_configuration'
+$:.unshift File.absolute_path('./lib', __dir__)
+require 'perfectosape/SNPScanRunner'
+require 'perfectosape/SNPScanResults'
+require 'sequence_with_snv'
+require 'site_list'
+require 'output_configuration'
 
 require 'tempfile'
 require 'optparse'
@@ -39,34 +41,40 @@ def possible_mutation_positions(sequence, ignore_positions: [])
   }.to_h
 end
 
-def mutated_sites_by_substitution_name(sequence, pvalue_cutoff: 0.0005, ignore_positions: [])
+def all_sites_in_file(filename, additional_options: [])
+  Ape.run_SNPScan(motif_collection: './motif_collection/',
+                  snvs_file: filename,
+                  precalulated_thresholds: './motif_collection_thresholds',
+                  fold_change_cutoff: 1,
+                  pvalue_cutoff: 1,
+                  additional_options: additional_options) do |pipe|
+    PerfectosAPE::Result.each_in_stream(pipe).to_a
+  end
+end
+
+def mutated_sites_by_substitution_name(sequence, ignore_positions: []) #, pvalue_cutoff: 0.0005)
   with_temp_file 'seq_generated.txt' do |f|
     possible_mutation_positions(sequence, ignore_positions: ignore_positions).each{|substitution_name, seq_w_snv|
       f.puts "#{substitution_name}\t#{seq_w_snv}"
     }
     f.close
 
-    cmd = "java -cp ape.jar ru.autosome.perfectosape.SNPScan ./motif_collection/ #{f.path} --precalc ./motif_collection_thresholds --fold-change-cutoff 1 --pvalue-cutoff 1"
-    IO.popen(cmd) do |pipe|
-      PerfectosAPE::Result.each_in_stream(pipe).to_a.group_by(&:variant_id)
-    end
+    all_sites_in_file(f.path).group_by(&:variant_id)
   end
 end
 
-def all_sites_in_sequence(sequence, pvalue_cutoff: 0.0005)
-  len = sequence.length
-  mid = len / 2 
+def all_sites_in_sequence(sequence) #, pvalue_cutoff: 0.0005)
   seq_w_snv = SequenceWithSNV.new('',[sequence[0], 'N'], sequence[1..-1])
-  with_temp_file 'seq_generated.txt' do |f|  
+  with_temp_file 'seq_generated.txt' do |f|
     f.puts "sequence\t#{seq_w_snv}"
     f.close
 
     # We expand region so we don't imply any restrictions due to fictitious substitutions.
     # Expansion region was taken with big reserve (just not to think)
-    cmd = "java -cp ape.jar ru.autosome.perfectosape.SNPScan ./motif_collection/ #{f.path} --precalc ./motif_collection_thresholds --fold-change-cutoff 1 --pvalue-cutoff 1 --expand-region #{sequence.length}"
-    IO.popen(cmd) do |pipe|
-      PerfectosAPE::Result.each_in_stream(pipe).to_a
-    end
+    all_sites_in_file(
+      f.path,
+      additional_options: ['--expand-region', sequence.length.to_s]
+    )
   end
 end
 

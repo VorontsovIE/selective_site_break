@@ -64,6 +64,10 @@ module PerfectosAPE
       fold_change >= fold_change_cutoff
     end
 
+    def site_position_changed?
+      pos_1 != pos_2 || orientation_1 != orientation_2
+    end
+
     # glues corresponding motif site positions on direct and reverse strands
     def snv_position_in_site_1_pwm
       if orientation_1 == :direct
