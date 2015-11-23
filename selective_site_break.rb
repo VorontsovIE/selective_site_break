@@ -57,6 +57,7 @@ OptionParser.new do |opts|
     pvalue_cutoff = Float(value)
   }
 end.parse!(ARGV)
+puts(fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
 
 raise 'Specify SNV sequence'  unless sequence_with_snv = ARGV[0] # 'AAGCAGCGGCTTCTGAAGGAGGTAT[C/T]TATTTTGGTCCCAAACAGAAAAGAG'
 sequence_with_snv = SequenceWithSNV.from_string(sequence_with_snv.upcase)
