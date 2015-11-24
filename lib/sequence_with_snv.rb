@@ -85,4 +85,45 @@ class SequenceWithSNV
   def inspect
     to_s
   end
+
+
+  # makes substitutions at other positions
+  # (changes one nucleotide into other constant nucleotide, not into pair of alleles)
+  # CCA[G/A]TCA at position 0 -->
+  #   [ACA[G/A]TCA, GCA[G/A]TCA, TCA[G/A]TCA]
+  def all_additional_substitutions_at_position(pos)
+    raise "Can't change position of SNV"  if pos == left.size
+    raise 'Out of range'  unless (0...length).include?(pos)
+    left_or_right = (pos < left.size) ? :left : :right
+    if left_or_right == :left
+      flank = left
+      pos_in_flank = pos
+    else
+      flank = right
+      pos_in_flank = pos - left.size - 1
+    end
+    original_nucleotide = flank[pos_in_flank].upcase
+    substitution_nucleotides = ['A','C','G','T'] - [original_nucleotide]
+    substitution_nucleotides.map{|substitution_nucleotide|
+      substitution_name = "add:#{pos},#{substitution_nucleotide}"
+      flank_replaced = flank[0, pos_in_flank] + substitution_nucleotide + flank[(pos_in_flank + 1)..-1]
+      if left_or_right == :left
+        seq_w_snv = SequenceWithSNV.new(flank_replaced, allele_variants, right)
+      else
+        seq_w_snv = SequenceWithSNV.new(left, allele_variants, flank_replaced)
+      end
+      [substitution_name, seq_w_snv]
+    }.to_h
+  end
+
+
+  # makes substitutions at other positions
+  # (changes one nucleotide into other constant nucleotide, not into pair of alleles)
+  # CCA[G/A]TCA -->
+  #   [ACA[G/A]TCA, GCA[G/A]TCA, TCA[G/A]TCA, ... CCT[G/A]TCA, CCA[G/A]ACA, ... CCA[G/A]TCT]
+  def all_additional_substitutions
+    (0...length).reject{|pos| pos == left.length }.flat_map{|pos|
+      all_additional_substitutions_at_position(pos).to_a
+    }.to_h
+  end
 end
