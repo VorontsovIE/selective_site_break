@@ -62,11 +62,11 @@ end
 
 
 # SNV to string, marking reference position with lowercase letter
-def format_snv(resulting_snv, pos_of_reference_snv)
-  result = resulting_snv.to_s.upcase
-  if pos_of_reference_snv < resulting_snv.left.length
+def format_snv(snv, pos_of_reference_snv)
+  result = snv.to_s.upcase
+  if pos_of_reference_snv < snv.left.length
     result[pos_of_reference_snv] = result[pos_of_reference_snv].downcase
-  elsif pos_of_reference_snv == resulting_snv.left.length          
+  elsif pos_of_reference_snv == snv.left.length          
     result[pos_of_reference_snv, 5] = result[pos_of_reference_snv, 5].downcase
   else
     result[pos_of_reference_snv + 4] = result[pos_of_reference_snv + 4].downcase
@@ -132,6 +132,43 @@ def format_motif_name(motif_name)
   "#{motif_name} (#{families.join(';')})"
 end
 
+def process_snv(snv, variant_id, site_infos,
+                stream: $stdout,
+                motif_families_to_disrupt:, pos_of_reference_snv:,
+                fold_change_cutoff:, pvalue_cutoff:)
+  pos_of_snv = variant_id.split(',').first.to_i
+  result = assess_mutations(
+    site_infos, motif_families_to_disrupt,
+    position_to_overlap: pos_of_reference_snv - pos_of_snv,
+    fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff
+  )
+
+  if !result[:affect_something_not_to_be_affected]
+    status = "No sites of other TF families affected"
+  elsif !result[:affect_something_reliable_not_to_be_affected]
+    status = "Only bad-quality motifs among other TF families affected"
+  else
+    status = "Affect good-quality motifs of other TF families" # Doesn't go to output
+  end
+
+  if result[:disrupted_something_to_be_disrupted] && !result[:affect_something_reliable_not_to_be_affected]
+    snv_text = format_snv(snv, pos_of_reference_snv)
+
+    stream.puts "#{variant_id}\t#{status}\t#{snv_text}"
+    unless result[:disrupted_motifs].empty? # Always true (for now)
+      stream.puts 'Disrupted: '
+      stream.puts result[:disrupted_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+    end
+    unless result[:emerged_motifs].empty?
+      stream.puts 'Emerged: '
+      stream.puts result[:emerged_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+    end
+    # stream.puts "Relocated: #{result[:relocated_motifs].join(' ')}"  unless result[:relocated_motifs].empty?
+    # stream.puts '------------------------------------'
+    stream.puts
+  end
+end
+
 #############################################
 motif_names = Dir.glob('./motif_collection/*.pwm').map{|fn| File.basename(fn, '.pwm').to_sym }
 
@@ -180,45 +217,14 @@ sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
   puts "======================\nAllele variant: #{allele}\n======================"
   sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))
   all_places = mutated_sites(sequence)
-
-  # at least sites
   all_sites = all_places.select{|site_info|
-    site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
-    site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
+    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
   }
-
   all_sites.group_by(&:variant_id).each{|variant_id, site_infos|
-    pos_of_snv = variant_id.sub(/^add:/, '').split(',').first.to_i
-    result = assess_mutations(
-      site_infos, motif_families_to_disrupt,
-      position_to_overlap: pos_of_reference_snv - pos_of_snv,
-      fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff
-    )
-
-    if !result[:affect_something_not_to_be_affected]
-      status = "No sites of other TF families affected"
-    elsif !result[:affect_something_reliable_not_to_be_affected]
-      status = "Only bad-quality motifs among other TF families affected"
-    else
-      status = "Affect good-quality motifs of other TF families" # Doesn't go to output
-    end
-
-    if result[:disrupted_something_to_be_disrupted] && !result[:affect_something_reliable_not_to_be_affected]
-      resulting_snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
-      resulting_snv_text = format_snv(resulting_snv, pos_of_reference_snv)
-
-      puts "#{variant_id}\t#{status}\t#{resulting_snv_text}"
-      unless result[:disrupted_motifs].empty? # Always true (for now)
-        puts 'Disrupted: '
-        puts result[:disrupted_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
-      end
-      unless result[:emerged_motifs].empty?
-        puts 'Emerged: '
-        puts result[:emerged_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
-      end
-      # $stderr.puts "Relocated: #{result[:relocated_motifs].join(' ')}"  unless result[:relocated_motifs].empty?
-      # $stderr.puts '------------------------------------'
-      puts
-    end
+    snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
+    process_snv(snv, variant_id, site_infos,
+                motif_families_to_disrupt: motif_families_to_disrupt,
+                pos_of_reference_snv: pos_of_reference_snv,
+                fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
   }
 }
