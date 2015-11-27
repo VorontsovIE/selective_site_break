@@ -12,7 +12,6 @@ require 'perfectosape/SNPScanRunner'
 require 'perfectosape/SNPScanResults'
 require 'perfectosape/Hocomoco10Results'
 require 'sequence_with_snv'
-require 'site_list'
 require 'WingenderTFClass'
 
 require 'tempfile'
@@ -66,7 +65,7 @@ def format_snv(snv, pos_of_reference_snv)
   result = snv.to_s.upcase
   if pos_of_reference_snv < snv.left.length
     result[pos_of_reference_snv] = result[pos_of_reference_snv].downcase
-  elsif pos_of_reference_snv == snv.left.length          
+  elsif pos_of_reference_snv == snv.left.length
     result[pos_of_reference_snv, 5] = result[pos_of_reference_snv, 5].downcase
   else
     result[pos_of_reference_snv + 4] = result[pos_of_reference_snv + 4].downcase
@@ -74,93 +73,132 @@ def format_snv(snv, pos_of_reference_snv)
   result
 end
 
+# TODO(refactor): move to a class
 def families_for_a_list_of_sites(sites)
   undefined_family_instead_of_empty = ->(families){ families.empty? ? ['Undefined'] : families }
   sites.map(&:motif_families).map(&undefined_family_instead_of_empty).flatten.uniq
 end
 
 ############################################
-def assess_mutations(site_infos, motif_families_to_disrupt,
-                    position_to_overlap:,
-                    fold_change_cutoff:, pvalue_cutoff:)
-  disrupted_sites = site_infos.select{|site_info|
-    site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
-  }
-  emerged_sites = site_infos.select{|site_info|
-    site_info.emerged?(fold_change_cutoff: fold_change_cutoff)
-  }
-  # only those disrupted motifs which overlap specific position
-  disrupted_sites_of_interest = disrupted_sites.select{|site_info|
-    site_info.overlap_position?(position_to_overlap)
-  }
-  relocated_sites = site_infos.select{|site_info|
-    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) && site_info.site_position_changed?
-  }
+class EffectAssessment
+  attr_reader :sites, :fold_change_cutoff, :pvalue_cutoff
+  # sites don't need to be actual sites on any allele
+  def initialize(sites, fold_change_cutoff:, pvalue_cutoff:)
+    @sites = sites
+    @fold_change_cutoff = fold_change_cutoff
+    @pvalue_cutoff = pvalue_cutoff
+  end
 
-  disrupted_motifs_of_interest = disrupted_sites_of_interest.map(&:motif_name).map(&:to_s)
-  relocated_motifs = relocated_sites.map(&:motif_name).map(&:to_s)
+  # sites having site on any allele
+  def actual_sites
+    @actual_sites ||= sites.select{|site|
+      site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
+    }
+  end
 
-  disrupted_motif_of_interest_families = disrupted_sites_of_interest.flat_map(&:motif_families).uniq
-  disrupted_something_to_be_disrupted = disrupted_motif_of_interest_families.any?{|family|
-    motif_families_to_disrupt.any?{|query_family| query_family == family }
-  }
-  affected_sites = (disrupted_sites + emerged_sites).uniq
-  affected_families = families_for_a_list_of_sites(affected_sites)
-  reliably_affected_families = families_for_a_list_of_sites(affected_sites.select(&:is_ABC_quality?))
+  def disrupted_sites
+    actual_sites.select{|site|
+      site.disrupted?(fold_change_cutoff: fold_change_cutoff)
+    }
+  end
 
-  affect_something_not_to_be_affected = !(affected_families - motif_families_to_disrupt).empty?
-  affect_something_reliable_not_to_be_affected = !(reliably_affected_families - motif_families_to_disrupt).empty?
+  def emerged_sites
+    actual_sites.select{|site|
+      site.emerged?(fold_change_cutoff: fold_change_cutoff)
+    }
+  end
 
-  
-  {
-    # affected_motif_families: affected_motif_families,
-    # affected_motifs: affected_motifs,
-    disrupted_sites: disrupted_sites,
-    emerged_sites: emerged_sites,
-    relocated_motifs: relocated_motifs,
-    disrupted_something_to_be_disrupted: disrupted_something_to_be_disrupted,
-    affect_something_not_to_be_affected: affect_something_not_to_be_affected,
-    affect_something_reliable_not_to_be_affected: affect_something_reliable_not_to_be_affected,
-  }
+  def relocated_sites
+    actual_sites.select(&:site_position_changed?)
+  end
+
+  def affected_sites
+    # (disrupted_sites + emerged_sites + relocated_sites).uniq
+    (disrupted_sites + emerged_sites).uniq
+  end
+
+  def reliable_affected_sites
+    affected_sites.select(&:is_ABC_quality?)
+  end
+
+  def affected_families
+    families_for_a_list_of_sites(affected_sites)
+  end
+
+  def reliable_affected_families
+    families_for_a_list_of_sites(reliable_affected_sites)
+  end
 end
 
-def process_snv(snv, variant_id, site_infos,
+# Effects for list of sites with regards to families of sites to be disrupted and the rest
+class EffectAssessmentForSpecifiedFamilies < EffectAssessment
+  attr_reader :motif_families_to_disrupt, :position_to_overlap
+  def initialize(sites, fold_change_cutoff:, pvalue_cutoff:, motif_families_to_disrupt:, position_to_overlap:)
+    super(sites, fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
+    @motif_families_to_disrupt = motif_families_to_disrupt
+    @position_to_overlap = position_to_overlap
+  end
+
+  def disrupted_sites_of_interest
+    disrupted_sites.select{|site_info|
+      site_info.overlap_position?(position_to_overlap)
+    }
+  end
+
+  def disrupted_something_to_be_disrupted?
+    disrupted_motif_of_interest_families = disrupted_sites_of_interest.flat_map(&:motif_families).uniq
+    disrupted_motif_of_interest_families.any?{|family|
+      motif_families_to_disrupt.any?{|query_family| query_family == family }
+    }
+  end
+
+  def affect_something_not_to_be_affected?
+    !(affected_families - motif_families_to_disrupt).empty?
+  end
+
+  def affect_something_reliable_not_to_be_affected?
+    !(reliable_affected_families - motif_families_to_disrupt).empty?
+  end
+
+  def status
+    if !affect_something_not_to_be_affected?
+      status = "No sites of other TF families affected"
+    elsif !affect_something_reliable_not_to_be_affected?
+      status = "Only bad-quality motifs among other TF families affected"
+    else
+      status = "Affect good-quality motifs of other TF families" # Doesn't go to output
+    end
+  end
+
+  def site_list_formatted_string(list_of_sites, header:, indent: "\t")
+    if list_of_sites.empty?
+      nil
+    else
+      "#{header}:\n" + \
+      list_of_sites.map{|site|
+        indent + site.motif_name_formatted # + (motif_families_to_disrupt - site.motif_families).empty?
+      }.join("\n") + "\n"
+    end
+  end
+end
+
+def process_snv(snv, variant_id, sites,
                 stream: $stdout,
                 motif_families_to_disrupt:, pos_of_reference_snv:,
                 fold_change_cutoff:, pvalue_cutoff:)
   pos_of_snv = variant_id.split(',').first.to_i
-  result = assess_mutations(
-    site_infos, motif_families_to_disrupt,
-    position_to_overlap: pos_of_reference_snv - pos_of_snv,
-    fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff
-  )
+  result = EffectAssessmentForSpecifiedFamilies.new(sites,
+    fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff,
+    motif_families_to_disrupt: motif_families_to_disrupt,
+    position_to_overlap: pos_of_reference_snv - pos_of_snv)
 
-  if !result[:affect_something_not_to_be_affected]
-    status = "No sites of other TF families affected"
-  elsif !result[:affect_something_reliable_not_to_be_affected]
-    status = "Only bad-quality motifs among other TF families affected"
-  else
-    status = "Affect good-quality motifs of other TF families" # Doesn't go to output
-  end
-
-  if result[:disrupted_something_to_be_disrupted] && !result[:affect_something_reliable_not_to_be_affected]
+  if result.disrupted_something_to_be_disrupted? && !result.affect_something_reliable_not_to_be_affected?
     snv_text = format_snv(snv, pos_of_reference_snv)
 
-    stream.puts "#{variant_id}\t#{status}\t#{snv_text}"
-    unless result[:disrupted_sites].empty? # Always true (for now)
-      stream.puts 'Disrupted: '
-      stream.puts result[:disrupted_sites].map{|site|
-        "\t" + site.motif_name_formatted # + (motif_families_to_disrupt - site.motif_families).empty?
-      }.join("\n")
-    end
-    unless result[:emerged_sites].empty?
-      stream.puts 'Emerged: '
-      stream.puts result[:emerged_sites].map{|site|
-        "\t" + site.motif_name_formatted
-      }.join("\n")
-    end
-    # stream.puts "Relocated: #{result[:relocated_motifs].join(' ')}"  unless result[:relocated_motifs].empty?
-    # stream.puts '------------------------------------'
+    stream.puts "#{variant_id}\t#{result.status}\t#{snv_text}"
+    stream.print result.site_list_formatted_string(result.disrupted_sites, header: "Disrupted")
+    stream.print result.site_list_formatted_string(result.emerged_sites, header: "Emerged")
+    stream.print result.site_list_formatted_string(result.relocated_sites, header: "Relocated")
     stream.puts
   end
 end
