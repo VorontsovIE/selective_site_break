@@ -10,6 +10,7 @@
 $:.unshift File.absolute_path('./lib', __dir__)
 require 'perfectosape/SNPScanRunner'
 require 'perfectosape/SNPScanResults'
+require 'perfectosape/Hocomoco10Results'
 require 'sequence_with_snv'
 require 'site_list'
 require 'WingenderTFClass'
@@ -26,6 +27,7 @@ ensure
   temp_file.unlink
 end
 
+# Hocomoco10 intended
 def all_sites_in_file(filename, additional_options: [])
   Ape.run_SNPScan(motif_collection: './motif_collection/',
                   snvs_file: filename,
@@ -33,7 +35,7 @@ def all_sites_in_file(filename, additional_options: [])
                   fold_change_cutoff: 1,
                   pvalue_cutoff: 1,
                   additional_options: additional_options) do |pipe|
-    PerfectosAPE::Result.each_in_stream(pipe).to_a
+    PerfectosAPE::Hocomoco10Result.each_in_stream(pipe).to_a
   end
 end
 
@@ -72,73 +74,49 @@ def format_snv(resulting_snv, pos_of_reference_snv)
   result
 end
 
+def families_for_a_list_of_sites(sites)
+  undefined_family_instead_of_empty = ->(families){ families.empty? ? ['Undefined'] : families }
+  sites.map(&:motif_families).map(&undefined_family_instead_of_empty).flatten.uniq
+end
+
 ############################################
 def assess_mutations(site_infos, motif_families_to_disrupt,
                     position_to_overlap:,
                     fold_change_cutoff:, pvalue_cutoff:)
-  disrupted_motifs = site_infos.select{|site_info|
+  disrupted_sites = site_infos.select{|site_info|
     site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
-  }.map(&:motif_name).map(&:to_s)
-
-  # # only those disrupted motifs which overlap specific position (they will be checked to be of the requested family)
-  disrupted_motifs_of_interest = site_infos.select{|site_info|
-    site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
-  }.select{|site_info|
-    best_site_pos = site_info.fold_change < 1 ? site_info.pos_1 : site_info.pos_2
-    (best_site_pos ... (best_site_pos + site_info.length)).include?(position_to_overlap)
-    # site overlap specified position
-  }.map(&:motif_name).map(&:to_s)
-  # disrupted_motifs_of_interest = disrupted_motifs
-
-  emerged_motifs = site_infos.select{|site_info|
+  }
+  emerged_sites = site_infos.select{|site_info|
     site_info.emerged?(fold_change_cutoff: fold_change_cutoff)
-  }.map(&:motif_name).map(&:to_s)
+  }
+  # only those disrupted motifs which overlap specific position
+  disrupted_sites_of_interest = disrupted_sites.select{|site_info|
+    site_info.overlap_position?(position_to_overlap)
+  }
+  relocated_sites = site_infos.select{|site_info|
+    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) && site_info.site_position_changed?
+  }
 
-  relocated_motifs = site_infos.select{|site_info|
-    (
-      site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
-      site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
-    ) && site_info.site_position_changed?
-  }.map(&:motif_name).map(&:to_s)
+  disrupted_motifs = disrupted_sites.map(&:motif_name).map(&:to_s)
+  emerged_motifs = emerged_sites.map(&:motif_name).map(&:to_s)
+  disrupted_motifs_of_interest = disrupted_sites_of_interest.map(&:motif_name).map(&:to_s)
+  relocated_motifs = relocated_sites.map(&:motif_name).map(&:to_s)
 
-
-  disrupted_uniprot_of_interest_ids = disrupted_motifs_of_interest.map{|motif_name| motif_name.split('.').first }
-  disrupted_motif_of_interest_families = disrupted_uniprot_of_interest_ids.flat_map{|uniprot_id|
-    WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-  }.uniq
-
+  disrupted_motif_of_interest_families = disrupted_sites_of_interest.flat_map(&:motif_families).uniq
   disrupted_something_to_be_disrupted = disrupted_motif_of_interest_families.any?{|family|
     motif_families_to_disrupt.any?{|query_family| query_family == family }
   }
-  
-  # affected_motifs = (disrupted_motifs + emerged_motifs + relocated_motifs).uniq
-  affected_motifs = (disrupted_motifs + emerged_motifs).uniq
-  affected_uniprot_ids = affected_motifs.map{|motif_name| motif_name.split('.').first }
-  affected_reliable_uniprot_ids = affected_motifs.select{|motif_name|
-      quality = motif_name.split('.').last
-      ['A','B','C'].include?(quality) # Don't mind if D or S quality motif was affected
-    }
-    .map{|motif_name| motif_name.split('.').first }
+  affected_sites = (disrupted_sites + emerged_sites).uniq
+  affected_families = families_for_a_list_of_sites(affected_sites)
+  reliably_affected_families = families_for_a_list_of_sites(affected_sites.select(&:is_ABC_quality?))
 
-
-  affect_something_not_to_be_affected = affected_uniprot_ids.any?{|uniprot_id|
-    families_of_motif = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-    (families_of_motif & motif_families_to_disrupt).empty?
-  }
-
-  affect_something_reliable_not_to_be_affected = affected_reliable_uniprot_ids.any?{|uniprot_id|
-    families_of_motif = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-    (families_of_motif & motif_families_to_disrupt).empty?
-  }
-
-  # affected_motif_families = affected_uniprot_ids.map{|uniprot_id|
-  #   WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-  # }.map{|families| families.empty? ? ['Undefined'] : families }.flatten.uniq
+  affect_something_not_to_be_affected = !(affected_families - motif_families_to_disrupt).empty?
+  affect_something_reliable_not_to_be_affected = !(reliably_affected_families - motif_families_to_disrupt).empty?
 
   
   {
     # affected_motif_families: affected_motif_families,
-    affected_motifs: affected_motifs,
+    # affected_motifs: affected_motifs,
     disrupted_motifs: disrupted_motifs,
     emerged_motifs: emerged_motifs,
     relocated_motifs: relocated_motifs,

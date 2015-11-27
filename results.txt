@@ -4,7 +4,7 @@ Motifs matching pattern: Ets-related factors{3.5.2}
 ======================
 Allele variant: A
 ======================
-21,A	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGC[T/A]TCCaGTCCTTGTGGTAGCACCTCTGTTTA
+21,A	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGC[T/A]TCCaGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -13,14 +13,14 @@ Disrupted:
 Emerged: 
 	MCR_HUMAN.H10MO.D (Steroid hormone receptors (NR3){2.1.1})
 
-22,A	Affect nothing	GAGCACCAGTGTGGTCTCTGCT[T/A]CCaGTCCTTGTGGTAGCACCTCTGTTTA
+22,A	No sites of other TF families affected	GAGCACCAGTGTGGTCTCTGCT[T/A]CCaGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-22,G	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGCT[T/G]CCaGTCCTTGTGGTAGCACCTCTGTTTA
+22,G	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGCT[T/G]CCaGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -30,7 +30,7 @@ Emerged:
 	MAFB_HUMAN.H10MO.D (Maf-related factors{1.1.3})
 	TGIF1_HUMAN.H10MO.D (TALE-type homeo domain factors{3.1.4})
 
-23,T	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGCTT[C/T]CaGTCCTTGTGGTAGCACCTCTGTTTA
+23,T	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGCTT[C/T]CaGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -39,14 +39,14 @@ Disrupted:
 Emerged: 
 	IRF8_HUMAN.H10MO.D (Interferon-regulatory factors{3.5.3})
 
-24,G	Affect nothing	GAGCACCAGTGTGGTCTCTGCTTC[C/G]aGTCCTTGTGGTAGCACCTCTGTTTA
+24,G	No sites of other TF families affected	GAGCACCAGTGTGGTCTCTGCTTC[C/G]aGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-24,T	Affect nothing	GAGCACCAGTGTGGTCTCTGCTTC[C/T]aGTCCTTGTGGTAGCACCTCTGTTTA
+24,T	No sites of other TF families affected	GAGCACCAGTGTGGTCTCTGCTTC[C/T]aGTCCTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ELK4_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	EHF_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -56,21 +56,21 @@ Disrupted:
 ======================
 Allele variant: G
 ======================
-28,A	Affect nothing	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/A]CTTGTGGTAGCACCTCTGTTTA
+28,A	No sites of other TF families affected	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/A]CTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 Emerged: 
 	SPDEF_HUMAN.H10MO.D (Ets-related factors{3.5.2})
 	SPIB_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-28,G	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/G]CTTGTGGTAGCACCTCTGTTTA
+28,G	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/G]CTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	EHF_HUMAN.H10MO.S (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 Emerged: 
 	TBX4_HUMAN.H10MO.D (TBX2-related factors{6.5.4})
 
-28,T	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/T]CTTGTGGTAGCACCTCTGTTTA
+28,T	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGCTTCCgGT[C/T]CTTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 Emerged: 
@@ -81,7 +81,7 @@ Emerged:
 	ELF5_HUMAN.H10MO.D (Ets-related factors{3.5.2})
 	BPTF_HUMAN.H10MO.D ()
 
-29,A	Affect only bad-quality motifs	GAGCACCAGTGTGGTCTCTGCTTCCgGTC[C/A]TTGTGGTAGCACCTCTGTTTA
+29,A	Only bad-quality motifs among other TF families affected	GAGCACCAGTGTGGTCTCTGCTTCCgGTC[C/A]TTGTGGTAGCACCTCTGTTTA
 Disrupted: 
 	GABPA_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -100,21 +100,21 @@ Motifs matching pattern: Ets-related factors{3.5.2}
 ======================
 Allele variant: C
 ======================
-29,A	Affect nothing	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/A]CTTGTGGTAGCACCTCTGTTT
+29,A	No sites of other TF families affected	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/A]CTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 Emerged: 
 	SPDEF_HUMAN.H10MO.D (Ets-related factors{3.5.2})
 	SPIB_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-29,G	Affect only bad-quality motifs	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/G]CTTGTGGTAGCACCTCTGTTT
+29,G	Only bad-quality motifs among other TF families affected	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/G]CTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	EHF_HUMAN.H10MO.S (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 Emerged: 
 	TBX4_HUMAN.H10MO.D (TBX2-related factors{6.5.4})
 
-29,T	Affect only bad-quality motifs	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/T]CTTGTGGTAGCACCTCTGTTT
+29,T	Only bad-quality motifs among other TF families affected	TGAGCACCAGTGTGGTCTCTGCTTCcGGT[C/T]CTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 Emerged: 
@@ -125,7 +125,7 @@ Emerged:
 	ELF5_HUMAN.H10MO.D (Ets-related factors{3.5.2})
 	BPTF_HUMAN.H10MO.D ()
 
-30,A	Affect only bad-quality motifs	TGAGCACCAGTGTGGTCTCTGCTTCcGGTC[C/A]TTGTGGTAGCACCTCTGTTT
+30,A	Only bad-quality motifs among other TF families affected	TGAGCACCAGTGTGGTCTCTGCTTCcGGTC[C/A]TTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	GABPA_HUMAN.H10MO.A (Ets-related factors{3.5.2})
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
@@ -139,22 +139,22 @@ Emerged:
 ======================
 Allele variant: T
 ======================
-21,G	Affect nothing	TGAGCACCAGTGTGGTCTCTG[C/G]TTCtGGTCCTTGTGGTAGCACCTCTGTTT
+21,G	No sites of other TF families affected	TGAGCACCAGTGTGGTCTCTG[C/G]TTCtGGTCCTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-23,A	Affect nothing	TGAGCACCAGTGTGGTCTCTGCT[T/A]CtGGTCCTTGTGGTAGCACCTCTGTTT
+23,A	No sites of other TF families affected	TGAGCACCAGTGTGGTCTCTGCT[T/A]CtGGTCCTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-24,A	Affect nothing	TGAGCACCAGTGTGGTCTCTGCTT[C/A]tGGTCCTTGTGGTAGCACCTCTGTTT
+24,A	No sites of other TF families affected	TGAGCACCAGTGTGGTCTCTGCTT[C/A]tGGTCCTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
 
-26,A	Affect only bad-quality motifs	TGAGCACCAGTGTGGTCTCTGCTTCt[G/A]GTCCTTGTGGTAGCACCTCTGTTT
+26,A	Only bad-quality motifs among other TF families affected	TGAGCACCAGTGTGGTCTCTGCTTCt[G/A]GTCCTTGTGGTAGCACCTCTGTTT
 Disrupted: 
 	ELF2_HUMAN.H10MO.C (Ets-related factors{3.5.2})
 	ETV1_HUMAN.H10MO.B (Ets-related factors{3.5.2})
@@ -235,7 +235,7 @@ Motifs matching pattern: Regulators of differentiation{5.1.1}
 ======================
 Allele variant: C
 ======================
-31,G	Affect only bad-quality motifs	AAGCAGCGGCTTCTGAAGGAGGTATcTATTT[T/G]GGTCCCAAACAGAAAAGAG
+31,G	Only bad-quality motifs among other TF families affected	AAGCAGCGGCTTCTGAAGGAGGTATcTATTT[T/G]GGTCCCAAACAGAAAAGAG
 Disrupted: 
 	MEF2A_HUMAN.H10MO.A (Regulators of differentiation{5.1.1})
 	HMGA1_HUMAN.H10MO.D (HMGA factors{8.2.1})

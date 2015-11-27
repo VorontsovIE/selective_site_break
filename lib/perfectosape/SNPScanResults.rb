@@ -86,6 +86,24 @@ module PerfectosAPE
       ! substitution_in_core?
     end
 
+    # best site overlaps specified position
+    def overlap_position?(pos)
+      best_site_range.include?(pos)
+    end
+
+    def best_site_position
+      (fold_change < 1) ? pos_1 : pos_2
+    end
+
+    def best_site_range
+      best_site_position ... (best_site_position + length)
+    end
+
+    # has site of specified strength at least on one allele
+    def has_site_on_any_allele?(pvalue_cutoff:)
+      site_before_substitution?(pvalue_cutoff: pvalue_cutoff) || site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
+    end
+
     def self.each_in_stream(stream, &block)
       stream.each_line.lazy.reject{|line|
         line.start_with?('#')
