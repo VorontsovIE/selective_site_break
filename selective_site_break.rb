@@ -97,8 +97,6 @@ def assess_mutations(site_infos, motif_families_to_disrupt,
     site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) && site_info.site_position_changed?
   }
 
-  disrupted_motifs = disrupted_sites.map(&:motif_name).map(&:to_s)
-  emerged_motifs = emerged_sites.map(&:motif_name).map(&:to_s)
   disrupted_motifs_of_interest = disrupted_sites_of_interest.map(&:motif_name).map(&:to_s)
   relocated_motifs = relocated_sites.map(&:motif_name).map(&:to_s)
 
@@ -117,19 +115,13 @@ def assess_mutations(site_infos, motif_families_to_disrupt,
   {
     # affected_motif_families: affected_motif_families,
     # affected_motifs: affected_motifs,
-    disrupted_motifs: disrupted_motifs,
-    emerged_motifs: emerged_motifs,
+    disrupted_sites: disrupted_sites,
+    emerged_sites: emerged_sites,
     relocated_motifs: relocated_motifs,
     disrupted_something_to_be_disrupted: disrupted_something_to_be_disrupted,
     affect_something_not_to_be_affected: affect_something_not_to_be_affected,
     affect_something_reliable_not_to_be_affected: affect_something_reliable_not_to_be_affected,
   }
-end
-
-def format_motif_name(motif_name)
-  uniprot_id = motif_name.split('.').first
-  families = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-  "#{motif_name} (#{families.join(';')})"
 end
 
 def process_snv(snv, variant_id, site_infos,
@@ -155,13 +147,17 @@ def process_snv(snv, variant_id, site_infos,
     snv_text = format_snv(snv, pos_of_reference_snv)
 
     stream.puts "#{variant_id}\t#{status}\t#{snv_text}"
-    unless result[:disrupted_motifs].empty? # Always true (for now)
+    unless result[:disrupted_sites].empty? # Always true (for now)
       stream.puts 'Disrupted: '
-      stream.puts result[:disrupted_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+      stream.puts result[:disrupted_sites].map{|site|
+        "\t" + site.motif_name_formatted # + (motif_families_to_disrupt - site.motif_families).empty?
+      }.join("\n")
     end
-    unless result[:emerged_motifs].empty?
+    unless result[:emerged_sites].empty?
       stream.puts 'Emerged: '
-      stream.puts result[:emerged_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+      stream.puts result[:emerged_sites].map{|site|
+        "\t" + site.motif_name_formatted
+      }.join("\n")
     end
     # stream.puts "Relocated: #{result[:relocated_motifs].join(' ')}"  unless result[:relocated_motifs].empty?
     # stream.puts '------------------------------------'
