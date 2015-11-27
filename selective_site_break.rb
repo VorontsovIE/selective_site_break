@@ -1,3 +1,12 @@
+# Показать, какие P-value у каждого аллеля и fold-change
+# Поставить галочки для мотивов нужного семейства и наоборот для вредных
+# Показать сам сайт для каждого предсказания каждого фактора
+# Писать отдельную секцию сайд-эффекты
+# Ставить звездочку, если убит тот же самый сайт.
+# показывать, что происходит с исходным мотивом
+# показывать подпороги
+# минимизировать число задетых семейств и показывать места, которые задевают мало других семейств (в случаях, где ничего не нашлось)
+
 $:.unshift File.absolute_path('./lib', __dir__)
 require 'perfectosape/SNPScanRunner'
 require 'perfectosape/SNPScanResults'
@@ -49,6 +58,102 @@ def additionally_mutated_sites(sequence_with_snv)
   sites_for_several_snvs(sequence_with_snv.all_additional_substitutions)
 end
 
+
+# SNV to string, marking reference position with lowercase letter
+def format_snv(resulting_snv, pos_of_reference_snv)
+  result = resulting_snv.to_s.upcase
+  if pos_of_reference_snv < resulting_snv.left.length
+    result[pos_of_reference_snv] = result[pos_of_reference_snv].downcase
+  elsif pos_of_reference_snv == resulting_snv.left.length          
+    result[pos_of_reference_snv, 5] = result[pos_of_reference_snv, 5].downcase
+  else
+    result[pos_of_reference_snv + 4] = result[pos_of_reference_snv + 4].downcase
+  end
+  result
+end
+
+############################################
+def assess_mutations(site_infos, motif_families_to_disrupt,
+                    position_to_overlap:,
+                    fold_change_cutoff:, pvalue_cutoff:)
+  disrupted_motifs = site_infos.select{|site_info|
+    site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
+  }.map(&:motif_name).map(&:to_s)
+
+  # # only those disrupted motifs which overlap specific position (they will be checked to be of the requested family)
+  disrupted_motifs_of_interest = site_infos.select{|site_info|
+    site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
+  }.select{|site_info|
+    best_site_pos = site_info.fold_change < 1 ? site_info.pos_1 : site_info.pos_2
+    (best_site_pos ... (best_site_pos + site_info.length)).include?(position_to_overlap)
+    # site overlap specified position
+  }.map(&:motif_name).map(&:to_s)
+  # disrupted_motifs_of_interest = disrupted_motifs
+
+  emerged_motifs = site_infos.select{|site_info|
+    site_info.emerged?(fold_change_cutoff: fold_change_cutoff)
+  }.map(&:motif_name).map(&:to_s)
+
+  relocated_motifs = site_infos.select{|site_info|
+    (
+      site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
+      site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
+    ) && site_info.site_position_changed?
+  }.map(&:motif_name).map(&:to_s)
+
+
+  disrupted_uniprot_of_interest_ids = disrupted_motifs_of_interest.map{|motif_name| motif_name.split('.').first }
+  disrupted_motif_of_interest_families = disrupted_uniprot_of_interest_ids.flat_map{|uniprot_id|
+    WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
+  }.uniq
+
+  disrupted_something_to_be_disrupted = disrupted_motif_of_interest_families.any?{|family|
+    motif_families_to_disrupt.any?{|query_family| query_family == family }
+  }
+  
+  # affected_motifs = (disrupted_motifs + emerged_motifs + relocated_motifs).uniq
+  affected_motifs = (disrupted_motifs + emerged_motifs).uniq
+  affected_uniprot_ids = affected_motifs.map{|motif_name| motif_name.split('.').first }
+  affected_reliable_uniprot_ids = affected_motifs.select{|motif_name|
+      quality = motif_name.split('.').last
+      ['A','B','C'].include?(quality) # Don't mind if D or S quality motif was affected
+    }
+    .map{|motif_name| motif_name.split('.').first }
+
+
+  affect_something_not_to_be_affected = affected_uniprot_ids.any?{|uniprot_id|
+    families_of_motif = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
+    (families_of_motif & motif_families_to_disrupt).empty?
+  }
+
+  affect_something_reliable_not_to_be_affected = affected_reliable_uniprot_ids.any?{|uniprot_id|
+    families_of_motif = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
+    (families_of_motif & motif_families_to_disrupt).empty?
+  }
+
+  # affected_motif_families = affected_uniprot_ids.map{|uniprot_id|
+  #   WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
+  # }.map{|families| families.empty? ? ['Undefined'] : families }.flatten.uniq
+
+  
+  {
+    # affected_motif_families: affected_motif_families,
+    affected_motifs: affected_motifs,
+    disrupted_motifs: disrupted_motifs,
+    emerged_motifs: emerged_motifs,
+    relocated_motifs: relocated_motifs,
+    disrupted_something_to_be_disrupted: disrupted_something_to_be_disrupted,
+    affect_something_not_to_be_affected: affect_something_not_to_be_affected,
+    affect_something_reliable_not_to_be_affected: affect_something_reliable_not_to_be_affected,
+  }
+end
+
+def format_motif_name(motif_name)
+  uniprot_id = motif_name.split('.').first
+  families = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
+  "#{motif_name} (#{families.join(';')})"
+end
+
 #############################################
 motif_names = Dir.glob('./motif_collection/*.pwm').map{|fn| File.basename(fn, '.pwm').to_sym }
 
@@ -64,7 +169,7 @@ OptionParser.new do |opts|
     pvalue_cutoff = Float(value)
   }
 end.parse!(ARGV)
-$stderr.puts(fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
+# $stderr.puts(fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
 
 raise 'Specify SNV sequence'  unless sequence_with_snv = ARGV[0] # 'AAGCAGCGGCTTCTGAAGGAGGTAT[C/T]TATTTTGGTCCCAAACAGAAAAGAG'
 sequence_with_snv = SequenceWithSNV.from_string(sequence_with_snv.upcase)
@@ -79,8 +184,8 @@ motif_families_to_disrupt = motifs_to_disrupt.flat_map{|motif_name|
   WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
 }.uniq
 
-$stderr.puts "Motifs matching pattern: #{motifs_to_disrupt.join('; ')}"
-$stderr.puts "Motifs matching pattern: #{motif_families_to_disrupt.join('; ')}"
+puts "Motifs matching pattern: #{motifs_to_disrupt.join('; ')}"
+puts "Motifs matching pattern: #{motif_families_to_disrupt.join('; ')}"
 # motif_families_to_disrupt = ARGV.drop(1).map{|pat| Regexp.new(pat, Regexp::IGNORECASE)}
 raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
 #############################################
@@ -88,63 +193,54 @@ raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
 
 # families_to_disrupt = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(motif_uniprot_id_to_disrupt)
 
-# all_places of binding without check for P-value
-all_places = additionally_mutated_sites(sequence_with_snv)
+pos_of_reference_snv = sequence_with_snv.left.size
 
-# at least sites
-all_sites = all_places.select{|site_info|
-  site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
-  site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
-}
+# # all_places of binding without check for P-value
+# all_places = additionally_mutated_sites(sequence_with_snv)
 
-all_sites.group_by(&:variant_id).each{|variant_id, site_infos|
-  disrupted_motifs = site_infos.select{|site_info|
-    site_info.disrupted?(fold_change_cutoff: fold_change_cutoff)
-  }.map(&:motif_name).map(&:to_s)
+sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
+  puts "======================\nAllele variant: #{allele}\n======================"
+  sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))
+  all_places = mutated_sites(sequence)
 
-  emerged_motifs = site_infos.select{|site_info|
-    site_info.emerged?(fold_change_cutoff: fold_change_cutoff)
-  }.map(&:motif_name).map(&:to_s)
-
-  relocated_motifs = site_infos.select{|site_info|
-    (
-      site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
-      site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
-    ) && site_info.site_position_changed?
-  }.map(&:motif_name).map(&:to_s)
-
-
-  disrupted_uniprot_ids = disrupted_motifs.map{|motif_name| motif_name.split('.').first }
-  disrupted_motif_families = disrupted_uniprot_ids.flat_map{|uniprot_id|
-    WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-  }.uniq
-
-  # affected_motifs = (disrupted_motifs + emerged_motifs + relocated_motifs).uniq
-  affected_motifs = (disrupted_motifs + emerged_motifs).uniq
-
-  affected_uniprot_ids = affected_motifs.select{|motif_name|
-      quality = motif_name.split('.').last
-      ['A','B','C'].include?(quality) # Don't mind if D or S quality motif was affected
-    }
-    .map{|motif_name| motif_name.split('.').first }
-  affected_motif_families = affected_uniprot_ids.flat_map{|uniprot_id|
-    WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-  }.uniq
-
-
-  disrupted_something_to_be_disrupted = disrupted_motif_families.any?{|family|
-    motif_families_to_disrupt.any?{|query_family| query_family == family }
-  }
-  affect_something_not_to_be_affected = affected_motif_families.any?{|family|
-    motif_families_to_disrupt.none?{|query_family| query_family == family }
+  # at least sites
+  all_sites = all_places.select{|site_info|
+    site_info.site_before_substitution?(pvalue_cutoff: pvalue_cutoff) ||
+    site_info.site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
   }
 
-  if disrupted_something_to_be_disrupted && !affect_something_not_to_be_affected
-    puts '------------------------------------'
-    puts variant_id
-    puts "Affected families: #{affected_motif_families.join('; ')}"
-    puts "Disrupted: #{disrupted_motifs.join(' ')}"  unless disrupted_motifs.empty?
-    puts "Emerged: #{emerged_motifs.join(' ')}"  unless emerged_motifs.empty?
-    puts "Relocated: #{relocated_motifs.join(' ')}"  unless relocated_motifs.empty?
-  end
+  all_sites.group_by(&:variant_id).each{|variant_id, site_infos|
+    pos_of_snv = variant_id.sub(/^add:/, '').split(',').first.to_i
+    result = assess_mutations(
+      site_infos, motif_families_to_disrupt,
+      position_to_overlap: pos_of_reference_snv - pos_of_snv,
+      fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff
+    )
+
+    if !result[:affect_something_not_to_be_affected]
+      status = "No sites of other TF families affected"
+    elsif !result[:affect_something_reliable_not_to_be_affected]
+      status = "Only bad-quality motifs among other TF families affected"
+    else
+      status = "Affect good-quality motifs of other TF families" # Doesn't go to output
+    end
+
+    if result[:disrupted_something_to_be_disrupted] && !result[:affect_something_reliable_not_to_be_affected]
+      resulting_snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
+      resulting_snv_text = format_snv(resulting_snv, pos_of_reference_snv)
+
+      puts "#{variant_id}\t#{status}\t#{resulting_snv_text}"
+      unless result[:disrupted_motifs].empty? # Always true (for now)
+        puts 'Disrupted: '
+        puts result[:disrupted_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+      end
+      unless result[:emerged_motifs].empty?
+        puts 'Emerged: '
+        puts result[:emerged_motifs].map{|motif_name| "\t" + format_motif_name(motif_name) }.join("\n")
+      end
+      # $stderr.puts "Relocated: #{result[:relocated_motifs].join(' ')}"  unless result[:relocated_motifs].empty?
+      # $stderr.puts '------------------------------------'
+      puts
+    end
+  }
 }
