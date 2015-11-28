@@ -4,8 +4,22 @@
 # Писать отдельную секцию сайд-эффекты
 # (done `!` и `?`) Ставить звездочку, если убит тот же самый сайт.
 # (done) показывать, что происходит с исходным мотивом
-# показывать подпороги
-# минимизировать число задетых семейств и показывать места, которые задевают мало других семейств (в случаях, где ничего не нашлось)
+# (done) показывать подпороги
+# (done) минимизировать число задетых семейств и показывать места, которые задевают мало других семейств (в случаях, где ничего не нашлось)
+
+# Формат:
+# - Первая колонка:
+#   - 𝘿 - сайт, который мы хотим разрушить
+#   - 𝙁 - сайт того же семейства, которое мы хотим разрушить
+#   - ∅ - сайт не того семейства, которое мы хотим разрушить
+#   - * - сайт качественного мотива
+# - Вторая колонка:
+#   - ⌘ - есть сильный сайт (на одном из аллелей)
+#   - ± - есть слабый сайт (на одном из аллелей)
+#   - <пустота> - не сайт
+# - Третья колонка (для сайтов при оригинальном снипе третьей колонки нет):
+#   - = - сайт тот же, что был изменен исходным снипом
+#   - ≠ - не тот же сайт
 
 $:.unshift File.absolute_path('./lib', __dir__)
 require 'perfectosape/SNPScanRunner'
@@ -82,28 +96,21 @@ def families_by_motif_names(motif_names, level: 3)
 end
 
 ############################################
-def process_snv(snv, variant_id, sites,
+def process_snv(snv, variant_id,
+                effect_assessment,
                 stream: $stdout,
-                original_sites:,
-                motifs_to_disrupt:,
-                pos_of_reference_snv:,
-                fold_change_cutoff:, pvalue_cutoff:)
-  pos_of_snv = variant_id.split(',').first.to_i
-  result = EffectAssessmentForSpecifiedFamilies.new(sites,
-    original_sites: original_sites,
-    fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff,
-    motifs_to_disrupt: motifs_to_disrupt,
-    position_to_overlap: pos_of_reference_snv - pos_of_snv)
+                pos_of_reference_snv:)
 
-  if result.disrupted_something_to_be_disrupted? && !result.affect_something_reliable_not_to_be_affected?
+  if effect_assessment.disrupted_something_to_be_disrupted? && effect_assessment.reliable_erroneously_affected_families.size <= 1 #!effect_assessment.affect_something_reliable_not_to_be_affected?
     snv_text = format_snv(snv, pos_of_reference_snv)
-
-    requested_to_disrupt = sites.select{|site| motifs_to_disrupt.include?(site.motif_name) }
-    stream.puts "#{variant_id}\t#{result.status}\t#{snv_text}"
-    stream.puts  result.site_list_formatted_string(requested_to_disrupt, header: "Requested to disrupt")
-    stream.print result.site_list_formatted_string(result.disrupted_sites, header: "Disrupted")
-    stream.print result.site_list_formatted_string(result.emerged_sites, header: "Emerged")
-    stream.print result.site_list_formatted_string(result.relocated_sites, header: "Relocated")
+    
+    stream.puts "#{variant_id}\t#{effect_assessment.status}\t#{snv_text}"
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, header: "Desired effects")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, header: "Side effects")
+    stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, header: "Requested to disrupt")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, header: "Disrupted")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, header: "Emerged")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.relocated_sites, header: "Relocated")
     stream.puts
   end
 end
@@ -112,7 +119,8 @@ end
 motif_names = Dir.glob('./motif_collection/*.pwm').map{|fn| File.basename(fn, '.pwm').to_sym }
 
 fold_change_cutoff = 4.0
-pvalue_cutoff = 0.0005
+pvalue_cutoff = 0.001
+strong_pvalue_cutoff = 0.0005
 OptionParser.new do |opts|
   opts.banner = "Usage: #{opts.program_name} <SNV sequence> <patterns> [options]"
   opts.separator 'Options:'
@@ -136,8 +144,8 @@ motifs_to_disrupt = motif_names.select{|motif|
 
 motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
 
-puts "Motifs matching pattern: #{motifs_to_disrupt.join('; ')}"
-puts "Motifs matching pattern: #{motif_families_to_disrupt.join('; ')}"
+puts "Motifs to disrupt 𝗗: #{motifs_to_disrupt.join('; ')}"
+puts "Motif families to disrupt 𝙁: #{motif_families_to_disrupt.join('; ')}"
 # motif_families_to_disrupt = ARGV.drop(1).map{|pat| Regexp.new(pat, Regexp::IGNORECASE)}
 raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
 #############################################
@@ -159,8 +167,8 @@ target_sites_sorted = sites_sorted_by_relevance(original_sites, motifs_to_disrup
 
 puts target_sites_sorted.map{|site|
   infos = [
-          motifs_to_disrupt.include?(site.motif_name) ? '*' : '',
-          site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) ? '+' : '-',
+          motifs_to_disrupt.include?(site.motif_name) ? '𝘿' : '',
+          site.has_site_on_any_allele?(pvalue_cutoff: strong_pvalue_cutoff) ? '⌘' : (site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) ? '±' : ''),
           # EffectAssessmentForSpecifiedFamilies.in_family?(site, motif_families_to_disrupt) ? '*' : '-',
           site.motif_name_formatted,
           site.effect_strength_string,
@@ -176,12 +184,21 @@ sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
   all_sites = all_places #.select{|site_info|
 #    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
 #  }
-  all_sites.group_by(&:variant_id).each{|variant_id, site_infos|
+  all_sites.group_by(&:variant_id).map{|variant_id, sites|
     snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
-    process_snv(snv, variant_id, site_infos,
-                original_sites: original_sites,
-                motifs_to_disrupt: motifs_to_disrupt,
-                pos_of_reference_snv: sequence_with_snv.left.size,
-                fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
+    pos_of_reference_snv = sequence_with_snv.left.size
+
+    pos_of_snv = variant_id.split(',').first.to_i
+    effect_assessment = EffectAssessmentForSpecifiedFamilies.new(sites,
+      original_sites: original_sites,
+      motifs_to_disrupt: motifs_to_disrupt,
+      position_to_overlap: pos_of_reference_snv - pos_of_snv,
+      fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
+
+    {effect_assessment: effect_assessment, snv: snv, variant_id: variant_id, pos_of_reference_snv: pos_of_reference_snv}
+  }.sort_by{|infos|
+    infos[:effect_assessment].reliable_erroneously_affected_families.size
+  }.each{|infos|
+    process_snv(infos[:snv], infos[:variant_id], infos[:effect_assessment], pos_of_reference_snv: infos[:pos_of_reference_snv])
   }
 }
