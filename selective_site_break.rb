@@ -1,9 +1,9 @@
-# Показать, какие P-value у каждого аллеля и fold-change
-# Поставить галочки для мотивов нужного семейства и наоборот для вредных
-# Показать сам сайт для каждого предсказания каждого фактора
+# (done) Показать, какие P-value у каждого аллеля и fold-change
+# (done `+`/`-` и `*`) Поставить галочки для мотивов нужного семейства и наоборот для вредных
+# (done) Показать сам сайт для каждого предсказания каждого фактора
 # Писать отдельную секцию сайд-эффекты
-# Ставить звездочку, если убит тот же самый сайт.
-# показывать, что происходит с исходным мотивом
+# (done `!` и `?`) Ставить звездочку, если убит тот же самый сайт.
+# (done) показывать, что происходит с исходным мотивом
 # показывать подпороги
 # минимизировать число задетых семейств и показывать места, которые задевают мало других семейств (в случаях, где ничего не нашлось)
 
@@ -60,6 +60,10 @@ def additionally_mutated_sites(sequence_with_snv)
 end
 
 
+def in_family?(site, families)
+  !(site.motif_families & families).empty?
+end
+
 # SNV to string, marking reference position with lowercase letter
 def format_snv(snv, pos_of_reference_snv)
   result = snv.to_s.upcase
@@ -77,6 +81,13 @@ end
 def families_for_a_list_of_sites(sites)
   undefined_family_instead_of_empty = ->(families){ families.empty? ? ['Undefined'] : families }
   sites.map(&:motif_families).map(&undefined_family_instead_of_empty).flatten.uniq
+end
+
+def families_by_motif_names(motif_names, level: 3)
+  motif_names.flat_map{|motif_name|
+    uniprot_id = motif_name.to_s.split('.').first
+    WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[level].subfamilies_by_uniprot_id(uniprot_id)
+  }.uniq
 end
 
 ############################################
@@ -132,11 +143,26 @@ end
 
 # Effects for list of sites with regards to families of sites to be disrupted and the rest
 class EffectAssessmentForSpecifiedFamilies < EffectAssessment
-  attr_reader :motif_families_to_disrupt, :position_to_overlap
-  def initialize(sites, fold_change_cutoff:, pvalue_cutoff:, motif_families_to_disrupt:, position_to_overlap:)
+  attr_reader :motifs_to_disrupt, :position_to_overlap, :original_sites
+  def initialize(sites, original_sites:, fold_change_cutoff:, pvalue_cutoff:, motifs_to_disrupt:, position_to_overlap:)
     super(sites, fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
-    @motif_families_to_disrupt = motif_families_to_disrupt
+    @motifs_to_disrupt = motifs_to_disrupt
     @position_to_overlap = position_to_overlap
+    @original_sites = original_sites
+  end
+
+  def motif_families_to_disrupt
+    @motif_families_to_disrupt ||= families_by_motif_names(motifs_to_disrupt)
+  end
+
+  # the same site which was broken by the reference SNP
+  def original_site?(site)
+    original_sites.select{|original_site|
+      original_site.motif_name == site.motif_name
+    }.select{|original_site|
+      position_to_overlap + original_site.best_site_position == site.pos_1 ||
+      position_to_overlap + original_site.best_site_position == site.pos_2
+    }.size > 0
   end
 
   def disrupted_sites_of_interest
@@ -176,7 +202,14 @@ class EffectAssessmentForSpecifiedFamilies < EffectAssessment
     else
       "#{header}:\n" + \
       list_of_sites.map{|site|
-        indent + site.motif_name_formatted # + (motif_families_to_disrupt - site.motif_families).empty?
+        infos = [
+          site.motif_name_formatted,
+          original_site?(site) ? '!' : '?',
+          in_family?(site, motif_families_to_disrupt) ? '*' : '-',
+          site.effect_strength_string,
+          "#{site.seq_1} --> #{site.seq_2}",
+        ]
+        indent + infos.join("\t")  # + (motif_families_to_disrupt - site.motif_families).empty?
       }.join("\n") + "\n"
     end
   end
@@ -184,18 +217,23 @@ end
 
 def process_snv(snv, variant_id, sites,
                 stream: $stdout,
-                motif_families_to_disrupt:, pos_of_reference_snv:,
+                original_sites:,
+                motifs_to_disrupt:,
+                pos_of_reference_snv:,
                 fold_change_cutoff:, pvalue_cutoff:)
   pos_of_snv = variant_id.split(',').first.to_i
   result = EffectAssessmentForSpecifiedFamilies.new(sites,
+    original_sites: original_sites,
     fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff,
-    motif_families_to_disrupt: motif_families_to_disrupt,
+    motifs_to_disrupt: motifs_to_disrupt,
     position_to_overlap: pos_of_reference_snv - pos_of_snv)
 
   if result.disrupted_something_to_be_disrupted? && !result.affect_something_reliable_not_to_be_affected?
     snv_text = format_snv(snv, pos_of_reference_snv)
 
+    requested_to_disrupt = sites.select{|site| motifs_to_disrupt.include?(site.motif_name) }
     stream.puts "#{variant_id}\t#{result.status}\t#{snv_text}"
+    stream.puts  result.site_list_formatted_string(requested_to_disrupt, header: "Requested to disrupt")
     stream.print result.site_list_formatted_string(result.disrupted_sites, header: "Disrupted")
     stream.print result.site_list_formatted_string(result.emerged_sites, header: "Emerged")
     stream.print result.site_list_formatted_string(result.relocated_sites, header: "Relocated")
@@ -223,15 +261,13 @@ end.parse!(ARGV)
 raise 'Specify SNV sequence'  unless sequence_with_snv = ARGV[0] # 'AAGCAGCGGCTTCTGAAGGAGGTAT[C/T]TATTTTGGTCCCAAACAGAAAAGAG'
 sequence_with_snv = SequenceWithSNV.from_string(sequence_with_snv.upcase)
 
-motifs_to_disrupt_patterns = ARGV.drop(1).map{|pat| Regexp.new(pat, Regexp::IGNORECASE) }
+patterns = ARGV.drop(1)
+motifs_to_disrupt_patterns = patterns.map{|pat| Regexp.new(pat, Regexp::IGNORECASE) }
 motifs_to_disrupt = motif_names.select{|motif|
   motifs_to_disrupt_patterns.any?{|pat| pat.match(motif) }
 }
 
-motif_families_to_disrupt = motifs_to_disrupt.flat_map{|motif_name|
-  uniprot_id = motif_name.to_s.split('.').first
-  WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(uniprot_id)
-}.uniq
+motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
 
 puts "Motifs matching pattern: #{motifs_to_disrupt.join('; ')}"
 puts "Motifs matching pattern: #{motif_families_to_disrupt.join('; ')}"
@@ -239,26 +275,46 @@ puts "Motifs matching pattern: #{motif_families_to_disrupt.join('; ')}"
 raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
 #############################################
 
+puts sequence_with_snv
+puts "Factor: #{patterns.join(', ')}"
 
-# families_to_disrupt = WingenderTFClass::ProteinFamilyRecognizers::HumanAtLevel[3].subfamilies_by_uniprot_id(motif_uniprot_id_to_disrupt)
+def sites_sorted_by_relevance(site_list, motifs_to_disrupt, pvalue_cutoff:)
+  motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
+  target_sites = site_list.select{|site|
+    in_family?(site, motif_families_to_disrupt)
+  }
+  target_sites.sort_by{|site| [site.pvalue_1, site.pvalue_2].min }
+end
 
-pos_of_reference_snv = sequence_with_snv.left.size
+original_sites = sites_for_several_snvs({'Original-SNP' => sequence_with_snv})
+target_sites_sorted = sites_sorted_by_relevance(original_sites, motifs_to_disrupt, pvalue_cutoff: pvalue_cutoff)
 
-# # all_places of binding without check for P-value
-# all_places = additionally_mutated_sites(sequence_with_snv)
+
+puts target_sites_sorted.map{|site|
+  infos = [
+          motifs_to_disrupt.include?(site.motif_name) ? '*' : '',
+          site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) ? '+' : '-',
+          # in_family?(site, motif_families_to_disrupt) ? '*' : '-',
+          site.motif_name_formatted,
+          site.effect_strength_string,
+          "#{site.seq_1} --> #{site.seq_2}",
+        ]
+  infos.join("\t")
+}
 
 sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
   puts "======================\nAllele variant: #{allele}\n======================"
   sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))
   all_places = mutated_sites(sequence)
-  all_sites = all_places.select{|site_info|
-    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
-  }
+  all_sites = all_places #.select{|site_info|
+#    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
+#  }
   all_sites.group_by(&:variant_id).each{|variant_id, site_infos|
     snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
     process_snv(snv, variant_id, site_infos,
-                motif_families_to_disrupt: motif_families_to_disrupt,
-                pos_of_reference_snv: pos_of_reference_snv,
+                original_sites: original_sites,
+                motifs_to_disrupt: motifs_to_disrupt,
+                pos_of_reference_snv: sequence_with_snv.left.size,
                 fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
   }
 }

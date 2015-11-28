@@ -27,8 +27,8 @@ module PerfectosAPE
       line
     end
 
-    def normalized_snv_name
-      variant_id.split("_", 2)[0]
+    def log2_fold_change
+      Math.log2(fold_change)
     end
 
     def length
@@ -99,9 +99,21 @@ module PerfectosAPE
       best_site_position ... (best_site_position + length)
     end
 
+    def best_site_word
+      (fold_change < 1) ? seq_1 : seq_2
+    end
+
+    def worse_site_word
+      (fold_change > 1) ? seq_1 : seq_2
+    end
+
     # has site of specified strength at least on one allele
     def has_site_on_any_allele?(pvalue_cutoff:)
       site_before_substitution?(pvalue_cutoff: pvalue_cutoff) || site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
+    end
+
+    def effect_strength_string
+      "log2-Fold change %<fold_change>7.2g: from P-value of %<pvalue_1>7.2g to P-value of %<pvalue_2>7.2g" % {fold_change: log2_fold_change, pvalue_1: pvalue_1, pvalue_2: pvalue_2}
     end
 
     def self.each_in_stream(stream, &block)
