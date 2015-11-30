@@ -9,17 +9,15 @@
 
 # Формат:
 # - Первая колонка:
-#   - 𝘿 - сайт, который мы хотим разрушить
-#   - 𝙁 - сайт того же семейства, которое мы хотим разрушить
-#   - ∅ - сайт не того семейства, которое мы хотим разрушить
+#   - ! - сайт, который мы хотим разрушить
+#   - ~ - сайт того же семейства, которое мы хотим разрушить
+#   - # - сайт не того семейства, которое мы хотим разрушить
 #   - * - сайт качественного мотива
 # - Вторая колонка:
-#   - ⌘ - есть сильный сайт (на одном из аллелей)
-#   - ± - есть слабый сайт (на одном из аллелей)
-#   - <пустота> - не сайт
-# - Третья колонка (для сайтов при оригинальном снипе третьей колонки нет):
-#   - = - сайт тот же, что был изменен исходным снипом
-#   - ≠ - не тот же сайт
+#   - S - есть сильный 0.0005 сайт (на одном из аллелей)
+#   - w - есть слабый 0.001 сайт (на одном из аллелей)
+#   - n - не сайт
+#   - r - сайт переехал
 
 $:.unshift File.absolute_path('./lib', __dir__)
 require 'perfectosape/SNPScanRunner'
@@ -103,14 +101,14 @@ def process_snv(snv, variant_id,
 
   if effect_assessment.disrupted_something_to_be_disrupted? && effect_assessment.reliable_erroneously_affected_families.size <= 1 #!effect_assessment.affect_something_reliable_not_to_be_affected?
     snv_text = format_snv(snv, pos_of_reference_snv)
-    
+
     stream.puts "#{variant_id}\t#{effect_assessment.status}\t#{snv_text}"
-    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, header: "Desired effects")
-    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, header: "Side effects")
-    stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, header: "Requested to disrupt")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, header: "Disrupted")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, header: "Emerged")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.relocated_sites, header: "Relocated")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, snv, header: "Desired effects")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, snv, header: "Side effects")
+    stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, snv, header: "Requested to disrupt")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, snv, header: "Disrupted")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, snv, header: "Emerged")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.relocated_sites, snv, header: "Relocated")
     stream.puts
   end
 end
@@ -144,14 +142,15 @@ motifs_to_disrupt = motif_names.select{|motif|
 
 motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
 
-puts "Motifs to disrupt 𝗗: #{motifs_to_disrupt.join('; ')}"
-puts "Motif families to disrupt 𝙁: #{motif_families_to_disrupt.join('; ')}"
 # motif_families_to_disrupt = ARGV.drop(1).map{|pat| Regexp.new(pat, Regexp::IGNORECASE)}
 raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
+
+puts "Original SNP: #{sequence_with_snv}"
+puts "Target transcription factor: #{patterns.join(', ')}"
+puts "Target motif (to induce affinity loss) !: #{motifs_to_disrupt.join('; ')}"
+puts "Target family ~: #{motif_families_to_disrupt.join('; ')}"
 #############################################
 
-puts sequence_with_snv
-puts "Factor: #{patterns.join(', ')}"
 
 def sites_sorted_by_relevance(site_list, motifs_to_disrupt, pvalue_cutoff:)
   motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
@@ -164,18 +163,15 @@ end
 original_sites = sites_for_several_snvs({'Original-SNP' => sequence_with_snv})
 target_sites_sorted = sites_sorted_by_relevance(original_sites, motifs_to_disrupt, pvalue_cutoff: pvalue_cutoff)
 
+headers = [
+  '', '', 'Motif', 'log2-Fold change',
+  "P-value #{sequence_with_snv.allele_variants[0]}", "P-value #{sequence_with_snv.allele_variants[1]}",
+  "Binding site #{sequence_with_snv.allele_variants[0]}", "Binding site #{sequence_with_snv.allele_variants[1]}",
+  "Allele with stronger prediction"
+]
 
-puts target_sites_sorted.map{|site|
-  infos = [
-          motifs_to_disrupt.include?(site.motif_name) ? '𝘿' : '',
-          site.has_site_on_any_allele?(pvalue_cutoff: strong_pvalue_cutoff) ? '⌘' : (site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) ? '±' : ''),
-          # EffectAssessmentForSpecifiedFamilies.in_family?(site, motif_families_to_disrupt) ? '*' : '-',
-          site.motif_name_formatted,
-          site.effect_strength_string,
-          "#{site.seq_1} --> #{site.seq_2}",
-        ]
-  infos.join("\t")
-}
+effect_assessment_original = EffectAssessment.new(original_sites, fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
+puts effect_assessment_original.site_list_formatted_string(target_sites_sorted, sequence_with_snv, motifs_to_disrupt, motif_families_to_disrupt, header: "Sites overlapping reference SNP of family requested to disrupt")
 
 sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
   puts "======================\nAllele variant: #{allele}\n======================"

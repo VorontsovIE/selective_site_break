@@ -69,34 +69,12 @@ class EffectAssessmentForSpecifiedFamilies < EffectAssessment
     end
   end
 
-  def site_list_formatted_string(list_of_sites, header:, indent: "")
-    if list_of_sites.empty?
-      nil
-    else
-      "#{header}:\n" + \
-      list_of_sites.map{|site|
-        infos = [
-          (motifs_to_disrupt.include?(site.motif_name) ? '𝘿' : '') + 
-            (EffectAssessmentForSpecifiedFamilies.in_family?(site, motif_families_to_disrupt) ? '𝙁' : '∅') + 
-            (site.is_ABC_quality? ? '*' : ''),
-          site.has_site_on_any_allele?(pvalue_cutoff: strong_pvalue_cutoff) ? '⌘' : (site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) ? '±' : ''),
-          original_site?(site) ? '=' : '≠',
-          site.motif_name_formatted,
-          site.effect_strength_string,
-          "#{site.seq_1} --> #{site.seq_2}",
-        ]
-        indent + infos.join("\t")  # + (motif_families_to_disrupt - site.motif_families).empty?
-      }.join("\n") + "\n"
-    end
-  end
-
   # def desired_effects
   #   disrupted_sites.select{|site|
   #     site.
   #   }
   # end
-
-  def self.in_family?(site, families)
-    !(site.motif_families & families).empty?
+  def site_list_formatted_string(list_of_sites, snv, header:, indent: "")
+    super(list_of_sites, snv, motifs_to_disrupt, motif_families_to_disrupt, header: header, indent: indent)
   end
 end

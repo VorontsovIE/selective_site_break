@@ -35,9 +35,27 @@ module PerfectosAPE
       seq_1.length
     end
 
+    def allele_1
+      letter = seq_1.each_char.detect{|letter| letter.upcase == letter }
+      orientation_1 == :direct ? letter : Sequence.revcomp(letter)
+    end
+
+    def allele_2
+      letter = seq_2.each_char.detect{|letter| letter.upcase == letter }
+      orientation_2 == :direct ? letter : Sequence.revcomp(letter)
+    end
+
+    def best_allele
+      fold_change < 1 ? allele_1 : allele_2
+    end
+
     # Not used
     def seq_1_direct_strand
       orientation_1 == :direct ? seq_1 : Sequence.revcomp(seq_1)
+    end
+
+    def seq_2_direct_strand
+      orientation_2 == :direct ? seq_2 : Sequence.revcomp(seq_2)
     end
 
     def seq_1_five_flank_length
@@ -112,8 +130,12 @@ module PerfectosAPE
       site_before_substitution?(pvalue_cutoff: pvalue_cutoff) || site_after_substitution?(pvalue_cutoff: pvalue_cutoff)
     end
 
-    def effect_strength_string
-      "log2-Fold change %<fold_change>7.2g: from P-value of %<pvalue_1>7.2g to P-value of %<pvalue_2>7.2g" % {fold_change: log2_fold_change, pvalue_1: pvalue_1, pvalue_2: pvalue_2}
+    def effect_strength_string(tabulated: false)
+      if tabulated
+        ['%7.2g' % log2_fold_change, '%7.2g' % pvalue_1, '%7.2g' % pvalue_2].join("\t")
+      else
+        "log2-Fold change %<fold_change>7.2g: from P-value of %<pvalue_1>7.2g to P-value of %<pvalue_2>7.2g" % {fold_change: log2_fold_change, pvalue_1: pvalue_1, pvalue_2: pvalue_2}
+      end
     end
 
     def self.each_in_stream(stream, &block)
