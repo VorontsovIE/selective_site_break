@@ -103,14 +103,23 @@ def process_snv(snv, variant_id,
     snv_text = format_snv(snv, pos_of_reference_snv)
 
     stream.puts "#{variant_id}\t#{effect_assessment.status}\t#{snv_text}"
-    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, snv, header: "Desired effects")
-    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, snv, header: "Side effects")
-    stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, snv, header: "Requested to disrupt")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, snv, header: "Disrupted")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, snv, header: "Emerged")
-    stream.print effect_assessment.site_list_formatted_string(effect_assessment.relocated_sites, snv, header: "Relocated")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, snv, header: "Desired effects")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, snv, header: "Side effects")
+    # stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, snv, header: "Requested to disrupt")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, snv, header: "Disrupted")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, snv, header: "Emerged")
+    # stream.print effect_assessment.site_list_formatted_string(effect_assessment.relocated_sites, snv, header: "Relocated")
     stream.puts
   end
+end
+
+
+def sites_sorted_by_relevance(site_list, motifs_to_disrupt, pvalue_cutoff:)
+  motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
+  target_sites = site_list.select{|site|
+    EffectAssessmentForSpecifiedFamilies.in_family?(site, motif_families_to_disrupt)
+  }
+  target_sites.sort_by{|site| [site.pvalue_1, site.pvalue_2].min }
 end
 
 #############################################
@@ -151,17 +160,17 @@ puts "Target motif (to induce affinity loss) !: #{motifs_to_disrupt.join('; ')}"
 puts "Target family ~: #{motif_families_to_disrupt.join('; ')}"
 #############################################
 
-
-def sites_sorted_by_relevance(site_list, motifs_to_disrupt, pvalue_cutoff:)
-  motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
-  target_sites = site_list.select{|site|
-    EffectAssessmentForSpecifiedFamilies.in_family?(site, motif_families_to_disrupt)
-  }
-  target_sites.sort_by{|site| [site.pvalue_1, site.pvalue_2].min }
-end
-
 original_sites = sites_for_several_snvs({'Original-SNP' => sequence_with_snv})
 target_sites_sorted = sites_sorted_by_relevance(original_sites, motifs_to_disrupt, pvalue_cutoff: pvalue_cutoff)
+best_alleles = motifs_to_disrupt.map{|motif_name| original_sites.detect{|site| site.motif_name == motif_name }.best_allele }.uniq
+if best_alleles.size == 1
+  best_allele = best_alleles[0]
+  puts "Base allele (with stronger prediction): #{best_allele}"
+elsif best_alleles.size > 1
+  puts "Diagnosis: several target motifs have different affinity change direction for a given SNP. Please check your input data!"
+else
+  raise 'WTF'
+end
 
 headers = [
   '', '', 'Motif', 'log2-Fold change',
@@ -173,28 +182,26 @@ headers = [
 effect_assessment_original = EffectAssessment.new(original_sites, fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
 puts effect_assessment_original.site_list_formatted_string(target_sites_sorted, sequence_with_snv, motifs_to_disrupt, motif_families_to_disrupt, header: "Sites overlapping reference SNP of family requested to disrupt")
 
-sequence_with_snv.allele_variants.each_with_index{|allele, allele_index|
-  puts "======================\nAllele variant: #{allele}\n======================"
-  sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))
-  all_places = mutated_sites(sequence)
-  all_sites = all_places #.select{|site_info|
-#    site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
-#  }
-  all_sites.group_by(&:variant_id).map{|variant_id, sites|
-    snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
-    pos_of_reference_snv = sequence_with_snv.left.size
+allele_index = sequence_with_snv.allele_variants.index{|allele| allele == best_allele }
+sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))
+all_places = mutated_sites(sequence)
+all_sites = all_places.select{|site_info|
+   site_info.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff)
+ }
+all_sites.group_by(&:variant_id).map{|variant_id, sites|
+  snv = sequence.sequence_with_snv_by_substitution_name(variant_id)
+  pos_of_reference_snv = sequence_with_snv.left.size
 
-    pos_of_snv = variant_id.split(',').first.to_i
-    effect_assessment = EffectAssessmentForSpecifiedFamilies.new(sites,
-      original_sites: original_sites,
-      motifs_to_disrupt: motifs_to_disrupt,
-      position_to_overlap: pos_of_reference_snv - pos_of_snv,
-      fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
+  pos_of_snv = variant_id.split(',').first.to_i
+  effect_assessment = EffectAssessmentForSpecifiedFamilies.new(sites,
+    original_sites: original_sites,
+    motifs_to_disrupt: motifs_to_disrupt,
+    position_to_overlap: pos_of_reference_snv - pos_of_snv,
+    fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
 
-    {effect_assessment: effect_assessment, snv: snv, variant_id: variant_id, pos_of_reference_snv: pos_of_reference_snv}
-  }.sort_by{|infos|
-    infos[:effect_assessment].reliable_erroneously_affected_families.size
-  }.each{|infos|
-    process_snv(infos[:snv], infos[:variant_id], infos[:effect_assessment], pos_of_reference_snv: infos[:pos_of_reference_snv])
-  }
+  {effect_assessment: effect_assessment, snv: snv, variant_id: variant_id, pos_of_reference_snv: pos_of_reference_snv}
+}.sort_by{|infos|
+  infos[:effect_assessment].reliable_erroneously_affected_families.size
+}.each{|infos|
+  process_snv(infos[:snv], infos[:variant_id], infos[:effect_assessment], pos_of_reference_snv: infos[:pos_of_reference_snv])
 }

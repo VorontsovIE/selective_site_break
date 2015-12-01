@@ -69,11 +69,15 @@ class EffectAssessmentForSpecifiedFamilies < EffectAssessment
     end
   end
 
-  # def desired_effects
-  #   disrupted_sites.select{|site|
-  #     site.
-  #   }
-  # end
+  def desired_effects
+    disrupted_sites.select{|site|
+      in_family?(site, motif_families_to_disrupt)
+    }
+  end
+  def side_effects
+    (disrupted_sites + emerged_sites) - desired_effects
+  end
+
   def site_list_formatted_string(list_of_sites, snv, header:, indent: "")
     super(list_of_sites, snv, motifs_to_disrupt, motif_families_to_disrupt, header: header, indent: indent)
   end
