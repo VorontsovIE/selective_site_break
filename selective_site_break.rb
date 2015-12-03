@@ -99,12 +99,15 @@ def process_snv(snv, variant_id,
                 stream: $stdout,
                 pos_of_reference_snv:)
 
-  if effect_assessment.disrupted_something_to_be_disrupted? && effect_assessment.reliable_erroneously_affected_families.size <= 1 #!effect_assessment.affect_something_reliable_not_to_be_affected?
+  if ! effect_assessment.desired_effects.empty? && \
+      families_by_motif_names( effect_assessment.side_effects.select(&:is_ABC_quality?).map(&:motif_name) ).uniq.size <= 2 #&& \
+      effect_assessment.side_effects.select(&:is_ABC_quality?).uniq.size <= 5 #!effect_assessment.affect_something_reliable_not_to_be_affected?
     snv_text = format_snv(snv, pos_of_reference_snv)
 
     stream.puts "#{variant_id}\t#{effect_assessment.status}\t#{snv_text}"
     stream.print effect_assessment.site_list_formatted_string(effect_assessment.desired_effects, snv, header: "Desired effects")
     stream.print effect_assessment.site_list_formatted_string(effect_assessment.side_effects, snv, header: "Side effects")
+    stream.print effect_assessment.site_list_formatted_string(effect_assessment.on_edge_effects, snv, header: "Edge effects")
     # stream.puts  effect_assessment.site_list_formatted_string(effect_assessment.sites_requested_to_disrupt, snv, header: "Requested to disrupt")
     # stream.print effect_assessment.site_list_formatted_string(effect_assessment.disrupted_sites, snv, header: "Disrupted")
     # stream.print effect_assessment.site_list_formatted_string(effect_assessment.emerged_sites, snv, header: "Emerged")
@@ -134,8 +137,11 @@ OptionParser.new do |opts|
   opts.on('--fold-change-cutoff CUTOFF', 'Fold change threshold to treat P-value change as significant') {|value|
     fold_change_cutoff = Float(value)
   }
-  opts.on('--pvalue-cutoff CUTOFF', 'P-value to treat a word as a site') {|value|
+  opts.on('--pvalue-cutoff CUTOFF', 'P-value to treat a word as a weak site') {|value|
     pvalue_cutoff = Float(value)
+  }
+  opts.on('--strong-pvalue-cutoff CUTOFF', 'P-value to treat a word as a strong site') {|value|
+    strong_pvalue_cutoff = Float(value)
   }
 end.parse!(ARGV)
 # $stderr.puts(fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff)
@@ -154,10 +160,24 @@ motif_families_to_disrupt = families_by_motif_names(motifs_to_disrupt)
 # motif_families_to_disrupt = ARGV.drop(1).map{|pat| Regexp.new(pat, Regexp::IGNORECASE)}
 raise 'Specify motif families to disrupt'  if motif_families_to_disrupt.empty?
 
+puts 'Legend:'
+puts '  Motif qualifiers:'
+puts '    ! - target motif'
+puts '    ~ - motif of target family'
+puts '    # - motif of another family'
+puts '    * - motif is reliable (A/B/C quality in Hocomoco10)'
+puts '  Site qualifiers:'
+puts "    S - strong site (P-value #{strong_pvalue_cutoff})"
+puts "    w - weak site (P-value #{pvalue_cutoff})"
+puts "    n - not a site"
+puts "    r - best position of motif was relocated"
+puts '--------------------------------------------'
+
 puts "Original SNP: #{sequence_with_snv}"
 puts "Target transcription factor: #{patterns.join(', ')}"
 puts "Target motif (to induce affinity loss) !: #{motifs_to_disrupt.join('; ')}"
 puts "Target family ~: #{motif_families_to_disrupt.join('; ')}"
+puts '--------------------------------------------'
 #############################################
 
 original_sites = sites_for_several_snvs({'Original-SNP' => sequence_with_snv})
@@ -176,11 +196,14 @@ headers = [
   '', '', 'Motif', 'log2-Fold change',
   "P-value #{sequence_with_snv.allele_variants[0]}", "P-value #{sequence_with_snv.allele_variants[1]}",
   "Binding site #{sequence_with_snv.allele_variants[0]}", "Binding site #{sequence_with_snv.allele_variants[1]}",
-  "Allele with stronger prediction"
+  "Allele with stronger prediction", 'TF family'
 ]
 
 effect_assessment_original = EffectAssessment.new(original_sites, fold_change_cutoff: fold_change_cutoff, pvalue_cutoff: pvalue_cutoff, strong_pvalue_cutoff: strong_pvalue_cutoff)
-puts effect_assessment_original.site_list_formatted_string(target_sites_sorted, sequence_with_snv, motifs_to_disrupt, motif_families_to_disrupt, header: "Sites overlapping reference SNP of family requested to disrupt")
+puts effect_assessment_original.site_list_formatted_string(target_sites_sorted, sequence_with_snv, motifs_to_disrupt, motif_families_to_disrupt, header: "Sites of family requested to disrupt overlapping reference SNP")
+puts '--------------------------------------------------'
+puts 'Suggested substitutions'
+puts '--------------------------------------------------'
 
 allele_index = sequence_with_snv.allele_variants.index{|allele| allele == best_allele }
 sequence = Sequence.new(sequence_with_snv.sequence_variant(allele_index))

@@ -71,11 +71,37 @@ class EffectAssessmentForSpecifiedFamilies < EffectAssessment
 
   def desired_effects
     disrupted_sites.select{|site|
+      site.has_site_on_any_allele?(pvalue_cutoff: strong_pvalue_cutoff)
+    }.select{|site|
       in_family?(site, motif_families_to_disrupt)
+    }.select{|site|
+      original_site?(site)
     }
   end
+
   def side_effects
-    (disrupted_sites + emerged_sites) - desired_effects
+    effects = []
+    effects += emerged_sites
+    effects += disrupted_sites.select{|site|
+      ! in_family?(site, motif_families_to_disrupt)
+    }
+    effects += disrupted_sites.select{|site|
+      in_family?(site, motif_families_to_disrupt)
+    }.select{|site|
+      ! original_site?(site)
+    }
+
+    effects.select{|site|
+      site.has_site_on_any_allele?(pvalue_cutoff: strong_pvalue_cutoff)
+    }
+  end
+
+  def on_edge_effects
+    effects = sites.select{|site|
+      site.has_site_on_any_allele?(pvalue_cutoff: pvalue_cutoff) # weak cutoff
+    }
+    effects -= desired_effects + side_effects
+    effects.uniq
   end
 
   def site_list_formatted_string(list_of_sites, snv, header:, indent: "")

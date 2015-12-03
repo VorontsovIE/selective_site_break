@@ -83,7 +83,7 @@ class EffectAssessment
         '', '', 'Motif', 'log2-Fold change',
         "P-value #{snv.allele_variants[0]}", "P-value #{snv.allele_variants[1]}",
         "Binding site #{snv.allele_variants[0]}", "Binding site #{snv.allele_variants[1]}",
-        "Allele with stronger prediction"
+        "Allele with stronger prediction", 'TF family'
       ]
 
       "#{header}:\n" + headers.join("\t") + "\n" + list_of_sites.map{|site|
